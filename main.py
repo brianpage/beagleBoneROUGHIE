@@ -1,6 +1,8 @@
 import Adafruit_BBIO.GPIO as GPIO
 import Adafruit_BBIO.PWM as PWM
 import Adafruit_BBIO.ADC as ADC
+import Adafruit_BBIO.UART as UART
+import serial
 
 
 #Set pin numbers
@@ -36,8 +38,26 @@ GPIO.setup(pumpDir,GPIO.OUT)
 
 ADC.setup()
 
+UART.setup("UART1")
+
+
+
+
+def main():
+	updateIMU()
+	updateCompass()
+	updateGlider()
+	logData()
+
+
+def updateIMU():
+
+
 
 def actuate():
 	#Low level motion controller
 
 	if mode==POSITION:
+
+def updateIMU():
+	
