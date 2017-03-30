@@ -3,7 +3,7 @@ import Adafruit_BBIO.PWM as PWM
 import Adafruit_BBIO.ADC as ADC
 import Adafruit_BBIO.UART as UART
 import serial
-
+from vnpy import *
 
 #Set pin numbers
 motAPWM = "P8_01"
@@ -17,12 +17,12 @@ motBConf2 = "P8_01"
 pumpOn = "P8_01"
 pumpDir = "P8_01"
 
-tankLevel = "P8_01"
-linPos = "P8_01"
+tankLevelPin = "P8_01"
+linPosPin = "P8_01"
 
-pressureSensor = "P8_01"
+pressureSensorPin = "P8_01"
 
-rotServo = "P8_01"
+rotServoPin = "P8_01"
 
 PWM.start(motAPWM,50)
 PWM.start(motBPWM,50)
@@ -40,8 +40,15 @@ ADC.setup()
 
 UART.setup("UART1")
 
+imu = VnSensor()
+imu.connect('/dev/tty01',baudrate=115200)
 
+ypr
+gps
 
+gliderLinPos
+gliderTankPos
+gliderPressure
 
 def main():
 	updateIMU()
@@ -51,7 +58,9 @@ def main():
 
 
 def updateIMU():
-
+	ypr = imu.read_yaw_pitch_roll()
+	gps = imu.read_gps_solution_lla()
+	gpsEst=imu.read_ins_solution_lla()
 
 
 def actuate():
@@ -59,5 +68,8 @@ def actuate():
 
 	if mode==POSITION:
 
-def updateIMU():
+def updateGlider():
+	gliderLinPos=ADC.read(linPosPin)
+	gliderTankPos=ADC.read(tankLevelPin)
+	gliderPressure=ADC.read(pressureSensorPin)
 	
