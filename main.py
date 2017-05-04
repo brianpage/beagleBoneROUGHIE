@@ -4,6 +4,7 @@ import Adafruit_BBIO.ADC as ADC
 import Adafruit_BBIO.UART as UART
 import serial
 from vnpy import *
+from Adafruit_I2C import Adafruit_I2C
 
 #Set pin numbers
 motAPWM = "P8_01"
@@ -23,6 +24,24 @@ linPosPin = "P8_01"
 pressureSensorPin = "P8_01"
 
 rotServoPin = "P8_01"
+
+#define glide states
+GLIDE = 0
+RESET = 1
+START = 2
+STOP = 3
+ROLLTEST = 4
+ROLLSTART = 5
+FLOAT = 6
+
+POSITION = 1
+PWM = 2
+
+DOWNGLIDE = 1
+NEUTRAL = 2
+UPGLIDE = 3
+
+i2c = Adafruit_I2C(0x1E)
 
 PWM.start(motAPWM,50)
 PWM.start(motBPWM,50)
@@ -50,10 +69,13 @@ gliderLinPos
 gliderTankPos
 gliderPressure
 
-def main():
+running=1
+
+while(running==1):
 	updateIMU()
 	updateCompass()
 	updateGlider()
+
 	logData()
 
 
@@ -73,3 +95,13 @@ def updateGlider():
 	gliderTankPos=ADC.read(tankLevelPin)
 	gliderPressure=ADC.read(pressureSensorPin)
 	
+def logData():
+	file=open("testfile.txt","w")
+	file.write(gliderLinPos)
+	file.write(",")
+	file.write(gliderTankPos)
+	file.write(",")
+	file.write(gliderPressure)
+	file.write(",")
+	file.write(ypr)
+	file.write()
