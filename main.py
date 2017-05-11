@@ -4,13 +4,14 @@ import Adafruit_BBIO.ADC as ADC
 import Adafruit_BBIO.UART as UART
 import serial
 from vnpy import *
-from Adafruit_I2C import Adafruit_I2C
+#from Adafruit_I2C import Adafruit_I2C
 import timeit
 
+
 #Set pin numbers
-motAPWM = "P8_01"
+motAPWM = 22
 motBPWM = "P8_01"
-motAConf1 = "P8_01"
+motAConf1 = "P8_24"
 motAConf2 = "P8_01"
 motStdby = "P8_01"
 motBConf1 = "P8_01"
@@ -42,10 +43,10 @@ DOWNGLIDE = 1
 NEUTRAL = 2
 UPGLIDE = 3
 
-i2c = Adafruit_I2C(0x1E)
+#i2c = Adafruit_I2C(0x1E)
 
-PWM.start(motAPWM,50)
-PWM.start(motBPWM,50)
+PWM.start("P9_14", 50)
+PWM.start(motBPWM, 50)
 PWM.start(rotServoPin,50)
 PWM.set_duty_cycle(motAPWM,0)
 PWM.set_duty_cycle(motBPWM,0)
@@ -80,8 +81,73 @@ while(running==1):
 	updateIMU()
 	updateCompass()
 	updateGlider()
+	if(SDgo):
+		logData()
 
-	logData()
+	newCommand=readSerial()
+	if newCommand != GLIDE:
+		command=newCommand
+
+	if command==START:
+		if checkPump(paramTankMid)&checkMass(paramLinMid):
+			completedGlides=0
+			t0=millis()
+			tstart=t0
+			rollI=0
+			rotOutput=0
+			lastUpAngle=0
+			lastDownAngle=0
+			downLoops=0
+			upLoops=0
+			currentState=DOWNGLIDE
+			flag=false
+			command=GLIDE
+		else:
+			actuate(paramLinMid,paramRotMid,paramTankMid,POSITION)
+
+	if command==STOP:
+		turnOff()
+
+	if command==GLIDE:
+		completedGlides=completedGlides+sawtooth(lin,rot,pump,mode)
+		actuate(lin,rot,pump,mode)
+		if completedGlides>=paramNumberofGlides:
+			command=FLOAT
+
+	if command==ROLLSTART:
+		tstart=millis()
+		rollI=0
+		rotStor=0
+		rollOutput=0
+		gliderRunTime=0
+		command=ROLLTEST
+
+	if command==ROLLTEST:
+		if gliderRunTime<30000:
+			rollAngle=0
+		elif gliderRunTime<45000:
+			rollAngle=paramRollover
+		elif gliderRunTime<60000:
+			rollAngle=-paramRollover
+		elif gliderRunTime<75000:
+			rollAngle=paramRollover
+		elif gliderRunTime<90000:
+			rollAngle=-paramRollover
+		elif gliderRunTime<105000:
+			rollAngle=paramRollover
+		elif gliderRunTime<120000:
+			rollAngle=-paramRollover
+		elif gliderRunTime<135000:
+			rollAngle=paramRollover
+		elif gliderRunTime<150000:
+			rollAngle=-paramRollover
+		else:
+			command=RESET
+
+		if turnFeedback:
+			rollAngle=rotPID(rollAngle)
+
+		actute(paramLinMid,rollAngle,paramTankMid,POSITION)
 
 
 def sawtooth():
@@ -91,19 +157,22 @@ def sawtooth():
 		pump=paramTankBackLimit
 		checkFF(pump,paramLinNoseDownTarget,flag)
 
-		if (feedforward&&!flag)||(!linPID):
+		if feedforward&flag==0:
+			linMode=POSTITION
+			lin=paramDownFeedforward
+		elif linPID==0:
 			linMode=POSTITION
 			lin=paramDownFeedforward
 		else:
 			linMode=PWM
 			lin=paramLinNoseDownTarget
-		if !delayRoll:
-			if circle||(dubin&&(millis()-t0<paramDubinTime)):
+		if delayRoll==0:
+			if circle|(dubin&(millis()-t0<paramDubinTime)):
 				rot=paramRollover
 			else:
 				rot=0
 		else:
-			if (flag&&(circle||(dubin&&(millis()-t0>paramDubinTime)))):
+			if (flag&(circle|(dubin&(millis()-t0>paramDubinTime)))):
 				rot=paramRollover
 			else:
 				rot=0
@@ -120,7 +189,7 @@ def sawtooth():
 
 	if currentState==NEUTRAL:
 		pump=paramTankMid
-		if feedforward&&millis()-t0>pumpTime:
+		if feedforward&millis()-t0>pumpTime:
 			if nextState==UPGLIDE:
 				lin=paramUpFeedforward
 			if nextState==DOWNGLIDE:
@@ -141,7 +210,7 @@ def sawtooth():
 			lastUpAngle=lastUpAngle+imuPitch
 		pump=paramTankFrontLimit
 		checkFF(pump,paramLinNoseUpTarget,flag)
-		if(feedforward&&!flag)||(!linPID):
+		if(feedforward&flag==0)|(linPID==0):
 			linMode=POSITION
 			lin=paramUpFeedforward
 		else:
@@ -150,15 +219,15 @@ def sawtooth():
 
 		if circle:
 			rot=-paramRollover
-		elif dubin&&(millis()-t0<paramDubinTime):
+		elif dubin&(millis()-t0<paramDubinTime):
 			rot=paramRollover
 		else:
 			rot=0
 
-		if !delayRoll:
+		if delayRoll==0:
 			if circle:
 				rot=-paramRollover
-			elif dubin&&(millis()-t0<paramDubinTime):
+			elif dubin&(millis()-t0<paramDubinTime):
 				rot=paramRollover
 			else:
 				rot=0
@@ -166,7 +235,7 @@ def sawtooth():
 			if flag:
 				if circle:
 					rot=-paramRollover
-				elif dubin&&(millis()-t0<paramDubinTime):
+				elif dubin&(millis()-t0<paramDubinTime):
 					rot=paramRollover
 				else:
 					rot=0
@@ -186,7 +255,7 @@ def sawtooth():
 			lin=linPIDrate(lin)
 	if turnFeedback:
 		rot=rotPID(rot)
-	if glideCompleted && !(completedGlides+1>=paramNumberofGlides):
+	if glideCompleted & (completedGlides+1<paramNumberofGlides):
 		lastUpAngle=0
 		lastDownAngle=0
 		upLoops=0
@@ -222,6 +291,14 @@ def checkMass(mass):
 	else:
 		return 0
 
+def checkFF(tank,angle,flag):
+	if abs(gliderTankPos-tank)<10 & abs(imuPitch-angle)<paramFFerror:
+		flag=1
+	if millis()-t0>paramFFtime:
+		flag=1
+
+	return flag
+
 
 def actuate(lin,rot,tank,mode):
 	#Low level motion controller
@@ -243,15 +320,20 @@ def actuate(lin,rot,tank,mode):
 
 	if mode==PWM:
 		lin=constrain(l,-100,100)
-		if lin>0 && gliderLinPos<=paramLinFrontLimit:
+		if lin>0 & gliderLinPos<=paramLinFrontLimit:
 			lin=0
-		if lin<0 && gliderLinPos>=paramLinBackLimit:
+		if lin<0 & gliderLinPos>=paramLinBackLimit:
 			lin=0
 		if abs(lin)<10:
 			lin=0
 		updateMotors(lin)
 	updateServo(rot)
 	updateTank(tank)
+
+
+def turnOff():
+	updateMotors(0)
+	updateTank(0)
 
 
 
@@ -300,7 +382,18 @@ def updateMotors(speed):
 	PWM.set_duty_cycle(motAPWM,abs(speed))
 	PWM.set_duty_cycle(motBPWM,abs(speed))
 
-	
+def rotPID(rot):
+	error=-(rot-imuRoll)
+	rollI=rollI+error/100
+	rotOutput=paramRollKp*error+paramRollKi*rollI+paramRollKd*imuRollD+rotOutput
+	rotOutput=constrain(rotOutput,-90,90)
+	return rotOutput
+
+def linPIDRate(lin):
+	P=-(lin-imuPitch)
+	linI=linI+P/100
+	return paramLinKp*P+paramLinKi*linI+paramLinKd*imuPitchD
+
 def logData():
 	file=open("testfile.txt","w")
 	file.write(gliderLinPos)
