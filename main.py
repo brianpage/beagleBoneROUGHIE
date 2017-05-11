@@ -1,16 +1,18 @@
-import Adafruit_BBIO.GPIO as GPIO
-import Adafruit_BBIO.PWM as PWM
+import Adafruit_BBIO.GPIO# as GPIO
+import Adafruit_BBIO.PWM# as PWM
 import Adafruit_BBIO.ADC as ADC
 import Adafruit_BBIO.UART as UART
 import serial
 from vnpy import *
 #from Adafruit_I2C import Adafruit_I2C
 import timeit
+import signal
+
 
 
 #Set pin numbers
 motAPWM = 22
-motBPWM = "P8_01"
+motBPWM = 22
 motAConf1 = "P8_24"
 motAConf2 = "P8_01"
 motStdby = "P8_01"
@@ -20,10 +22,10 @@ motBConf2 = "P8_01"
 pumpOn = "P8_01"
 pumpDir = "P8_01"
 
-tankLevelPin = "P8_01"
-linPosPin = "P8_01"
+tankLevelPin = "P9_37"
+linPosPin = "P9_37"
 
-pressureSensorPin = "P8_01"
+pressureSensorPin = "P9_37"
 
 rotServoPin = "P8_01"
 
@@ -45,113 +47,30 @@ UPGLIDE = 3
 
 #i2c = Adafruit_I2C(0x1E)
 
-PWM.start("P9_14", 50)
-PWM.start(motBPWM, 50)
-PWM.start(rotServoPin,50)
-PWM.set_duty_cycle(motAPWM,0)
-PWM.set_duty_cycle(motBPWM,0)
+Adafruit_BBIO.PWM.start("P9_14", 50)
+Adafruit_BBIO.PWM.start("P9_14", 50)
+Adafruit_BBIO.PWM.start("P9_14",50)
+Adafruit_BBIO.PWM.set_duty_cycle("P9_14",0)
+Adafruit_BBIO.PWM.set_duty_cycle("P9_14",0)
 
 
-GPIO.setup(motAConf1,GPIO.OUT)
-GPIO.setup(motAConf2,GPIO.OUT)
-GPIO.setup(motBConf1,GPIO.OUT)
-GPIO.setup(motBConf2,GPIO.OUT)
-GPIO.setup(pumpOn,GPIO.OUT)
-GPIO.setup(pumpDir,GPIO.OUT)
+Adafruit_BBIO.GPIO.setup("P9_14",Adafruit_BBIO.GPIO.OUT)#motconfa1
+Adafruit_BBIO.GPIO.setup("P9_14",Adafruit_BBIO.GPIO.OUT)#motconfa2
+Adafruit_BBIO.GPIO.setup("P9_14",Adafruit_BBIO.GPIO.OUT)#motconfb1
+Adafruit_BBIO.GPIO.setup("P9_14",Adafruit_BBIO.GPIO.OUT)#motconfb2
+Adafruit_BBIO.GPIO.setup("P9_14",Adafruit_BBIO.GPIO.OUT)#motstby
+Adafruit_BBIO.GPIO.setup("P9_14",Adafruit_BBIO.GPIO.OUT)#pumpon
 
 ADC.setup()
 
 UART.setup("UART1")
 
+
 imu = VnSensor()
-imu.connect('/dev/tty01',baudrate=115200)
+imu.connect('/dev/ttyUSB0',115200)
 
-ypr
-gps
-
-gliderLinPos
-gliderTankPos
-gliderPressure
-
-running=1
-
-start = timeit.timeit()
-
-while(running==1):
-	updateIMU()
-	updateCompass()
-	updateGlider()
-	if(SDgo):
-		logData()
-
-	newCommand=readSerial()
-	if newCommand != GLIDE:
-		command=newCommand
-
-	if command==START:
-		if checkPump(paramTankMid)&checkMass(paramLinMid):
-			completedGlides=0
-			t0=millis()
-			tstart=t0
-			rollI=0
-			rotOutput=0
-			lastUpAngle=0
-			lastDownAngle=0
-			downLoops=0
-			upLoops=0
-			currentState=DOWNGLIDE
-			flag=false
-			command=GLIDE
-		else:
-			actuate(paramLinMid,paramRotMid,paramTankMid,POSITION)
-
-	if command==STOP:
-		turnOff()
-
-	if command==GLIDE:
-		completedGlides=completedGlides+sawtooth(lin,rot,pump,mode)
-		actuate(lin,rot,pump,mode)
-		if completedGlides>=paramNumberofGlides:
-			command=FLOAT
-
-	if command==ROLLSTART:
-		tstart=millis()
-		rollI=0
-		rotStor=0
-		rollOutput=0
-		gliderRunTime=0
-		command=ROLLTEST
-
-	if command==ROLLTEST:
-		if gliderRunTime<30000:
-			rollAngle=0
-		elif gliderRunTime<45000:
-			rollAngle=paramRollover
-		elif gliderRunTime<60000:
-			rollAngle=-paramRollover
-		elif gliderRunTime<75000:
-			rollAngle=paramRollover
-		elif gliderRunTime<90000:
-			rollAngle=-paramRollover
-		elif gliderRunTime<105000:
-			rollAngle=paramRollover
-		elif gliderRunTime<120000:
-			rollAngle=-paramRollover
-		elif gliderRunTime<135000:
-			rollAngle=paramRollover
-		elif gliderRunTime<150000:
-			rollAngle=-paramRollover
-		else:
-			command=RESET
-
-		if turnFeedback:
-			rollAngle=rotPID(rollAngle)
-
-		actute(paramLinMid,rollAngle,paramTankMid,POSITION)
-
-
-def sawtooth():
-	pumpDone
+def sawtooth(lin,rot,pump,mode):
+	pumpDone=0
 	glideCompleted=0
 	if currentState==DOWNGLIDE:
 		pump=paramTankBackLimit
@@ -268,9 +187,10 @@ def millis():
 	return timer.timeit()
 
 def updateIMU():
+	global imu
 	ypr = imu.read_yaw_pitch_roll()
-	gps = imu.read_gps_solution_lla()
-	gpsEst=imu.read_ins_solution_lla()
+	# gps = imu.read_gps_solution_lla()
+	# gpsEst=imu.read_ins_solution_lla()
 
 def updateGlider():
 	gliderLinPos=ADC.read(linPosPin)
@@ -278,6 +198,8 @@ def updateGlider():
 	gliderPressure=ADC.read(pressureSensorPin)
 
 
+def updateCompass():
+	dummyVar=0
 
 def checkPump(tank):
 	if(abs(gliderTankPos-tank)<10):
@@ -404,3 +326,389 @@ def logData():
 	file.write(",")
 	file.write(ypr)
 	file.write(",")
+	
+TIMEOUT = 0.01 # number of seconds your want for timeout
+
+def interrupted(signum, frame):
+    "called when read times out"
+    print 'interrupted!'
+signal.signal(signal.SIGALRM, interrupted)
+
+def input():
+    try:
+            foo = raw_input()
+            return foo
+    except:
+            # timeout
+            return
+	
+def readSerial():
+	global command
+	value=input().split()
+	print value
+	if value[0]=="exit":
+		print("shutting down the script")
+		exit()
+		
+	if value[0]=="reset":
+		print("Glider Resetting")
+		command=RESET
+	
+	if value[0]=="start":
+		pressure_b=pressure_m*gliderPressure
+		print("Pressure Calibrated")
+		print("Starting")
+		command=START
+	
+	if value[0]=="toDefault":
+		paramInit()
+		print("Parameters set to default")
+	
+	if value[0]=="rollTest":
+		pressure_b=pressure_m*gliderPressure
+		print("Roll test starting in 30 seconds")
+		command=ROLLSTART
+		
+	if value[0]=="stop":
+		print("Stopping")
+		command=STOP
+		
+	if value[0]=="sdstart":
+		if SDgo==0:
+			createSDfile(name_of_file)
+			SDgo=1
+			print("SD start")
+		else:
+			print("Can't start a second file until current one is closed")
+			
+	if value[0]=="sdstop":
+		if SDgo:
+			closeFile()
+			print("File closed")
+		else:
+			print("No file to close")
+			
+	if value[0]=="turnto":
+		dummy=0
+	
+	if value[0]=="circle":
+		if circle:
+			circle=0
+		else:
+			circle=1
+			dubin=0
+			headingControl=0
+		printController()
+	
+	if value[0]=="headingControl":
+		if headingControl:
+			headingControl=0
+		else:
+			headingControl=1
+			dubin=0
+			circle=0
+		printController()
+
+	if value[0]=="updateHeading":
+		desHeading=compassHeading
+		print("Desired heading updated to: "+desHeading)
+	
+	if value[0]=="feedforward":
+		if feedforward:
+			feedforward=0
+		else:
+			feedforward=1
+			
+	if value[0]=="dubin":
+		if dubin:
+			dubin=0
+		else:
+			dubin=1
+			circle=0
+			headingControl=0
+		printController()
+		
+	if value[0]=="linear":
+		if linPID:
+			linPID=0
+		else:
+			linPID=1
+			
+		printController()
+		
+	if value[0]=="turnFeedback":
+		if turnFeedback:
+			turnFeedback=0
+		else:
+			turnFeedback=1
+	
+	if value[0]=="float":
+		print("floating")
+		command=FLOAT
+		
+	if value[0]=="pressurecontrol":
+		if pressureControl:
+			pressureControl=0
+		else:
+			pressureControl=1
+		printController()
+	
+	if value[0]=="delayRoll":
+		if delayRoll:
+			delayRoll=0
+		else:
+			delayRoll=1
+		printController()
+	
+	if value[0]=="pressurecal":
+		pressure_b=pressure_m*gliderPressure
+		
+	if value[0]=="gimme":
+		if value[1]=="glideAngles":
+			print("Final seond IMU averages")
+			print("Last downglide angle: "+lastDownAngle/downLoops)
+			print("Last upglide angle: "+lastUpAngle/upLoops)
+		
+		if value[1]=="power":
+			print("print power stuff (TODO)")
+		
+		if value[1]=="status":
+			print("Roll: "+imuRoll)
+			print("Pitch: "+imuPitch)
+			print("Yaw: "+imuYaw)
+			print("Tank Level: "+gliderTankPos)
+			print("Linear Position: "+gliderLinPos)
+			print("Pressure: "+gliderPressure)
+			print("Latitude: "+gpsLat)
+			print("Longitude: "+gpsLong)
+	
+	if value[0]=="update":
+		arg=float(value[2])
+		if value[1]=="-rollover":
+			paramRollover=arg
+			print("Updated Rollover to: "+paramRollover)
+		if value[1]=="-dubinTime":
+			paramDubinTime=arg
+			print("Updated Dubintime to: "+paramDubinTime)
+		if value[1]=="-upFeedforward":
+			paramUpFeedforward=arg
+			print("Updated Upfeedforward to: "+paramUpFeedforward)
+		if value[1]=="-downFeedforward":
+			paramDownFeedforward=arg
+			print("Updated downFeedforward to: "+paramDownFeedforward)
+		if value[1]=="-glidebottom":
+			paramGlideCycleBottom=arg
+			print("Updated glidebottom to: "+paramGlideCycleBottom)
+		if value[1]=="-glidetop":
+			paramGlideCycleTop=arg
+			print("Updated glidetop to: "+paramGlideCycleTop)
+		if value[1]=="-linrate":
+			paramLinRate=arg
+			print("Updated linrate to: "+paramLinRate)
+		if value[1]=="-destime":
+			paramDesTime=arg
+			print("Updated destime to: "+paramDesTime)
+		if value[1]=="-FFerror":
+			paramFFerror=arg
+			print("Updated FFerror to: "+paramFFerror)
+		if value[1]=="-FFtime":
+			paramFFtime=arg
+			print("Updated FFtime to: "+paramFFtime)
+		if value[1]=="-neutralTime":
+			paramNeutralTime=arg
+			print("Updated neutraltime to: "+paramNeutralTime)
+		if value[1]=="-risetime":
+			paramRiseTime=arg
+			print("Updated risetime to: "+paramRiseTime)
+		if value[1]=="-linmid":
+			paramLinMid=arg
+			print("Updated linmid to: "+paramLinMid)
+		if value[1]=="-rotmid":
+			paramRotMid=arg
+			print("Updated rotmid to: "+paramRotMid)
+		if value[1]=="-tankmid":
+			paramTankMid=arg
+			print("Updated tankmid to: "+paramTankMid)
+		if value[1]=="-linfrontlimit":
+			paramLinFrontLimit=arg
+			print("Updated linfrontlimit to: "+paramLinFrontLimit)
+		if value[1]=="-linbacklimit":
+			paramLinBackLimit=arg
+			print("Updated linbacklimit to: "+paramLinBackLimit)
+		if value[1]=="-tankbacklimit":
+			paramTankBackLimit=arg
+			print("Updated tankbacklimit to: "+paramTankBackLimit)
+		if value[1]=="-tankfrontlimit":
+			paramTankFrontLimit=arg
+			print("Updated tankfrontlimit to: "+paramTankFrontLimit)
+		if value[1]=="-rotlowlimit":
+			paramRotLowLimit=arg
+			print("Updated rotlowlimit to: "+paramRotLowLimit)
+		if value[1]=="-rothighlimit":
+			paramRotHighLimit=arg
+			print("Updated rothighlimit to: "+paramRotHighLimit)
+		if value[1]=="-linkp":
+			paramLinKp=arg
+			print("Updated linkp to: "+paramLinKp)
+		if value[1]=="-linki":
+			paramLinKi=arg
+			print("Updated linki to: "+paramLinKi)
+		if value[1]=="-linkd":
+			paramLinKd=arg
+			print("Updated linkd to: "+paramLinKd)
+		if value[1]=="-rollkp":
+			paramRollKp=arg
+			print("Updated rollkp to: "+paramRollKp)
+		if value[1]=="-rollki":
+			paramRollKi=arg
+			print("Updated rollki to: "+paramRollKi)
+		if value[1]=="-rollkd":
+			paramRollKd=arg
+			print("Updated rollkd to: "+paramRollKd)
+		if value[1]=="-headingkp":
+			paramHeadingKp=arg
+			print("Updated headingkp to: "+paramHeadingKp)
+		if value[1]=="-desiredheading":
+			desHeading=arg
+			print("Updated desiredheading to: "+desHeading)
+		if value[1]=="-linnoseuptarget":
+			paramLinNoseUpTarget=arg
+			print("Updated linnoseuptarget to: "+paramLinNoseUpTarget)
+		if value[1]=="-linnosedowntarget":
+			paramLinNoseDownTarget=arg
+			print("Updated linnosedowntarget to: "+paramLinNoseDownTarget)
+		if value[1]=="-numberofglides":
+			paramNumberofGlides=arg
+			print("Updated numbersofglides to: "+paramNumberofGlides)
+	if value[0]=="imucal":
+		imuRolloffset=0
+		imuPitchoffset=0
+		updateIMU()
+		imuRolloffset=-imuRoll
+		imuPitchoffset=-imuPitch
+		print("IMU Calibrated")
+		print("Roll offset: "+imuRolloffset)
+		print("Pitch offset: "+imuPitchoffset)
+	if value[0]=="imureset":
+		imuRolloffset=0
+		imuPitchoffset=0
+		print("IMU forgotten")
+	if value[0]=="params":
+		print("Desired rotational mass position: "+paramDesiredRotaryPosition+" Acceptable range: "+paramRotLowLimit+" to "+paramRotHighLimit)
+		print("Linear mass acceptable range: "+paramLinFrontLimit+" to "+paramLinBackLimit)
+		print("Ballast acceptable range: "+paramTankFrontLimit+"(full) to "+paramTankFrontLimit+"(empty)")
+		print("Descent time: "+paramDesTime)
+		print("Rise time: "+paramRiseTime)
+		print("Neutral time: "+paramNeutralTime)
+		print("Dubin time: "+paramDubinTime)
+		print("Feedforward timeout: "+paramFFtime)
+		print("Feedforward error bound: "+paramFFerror)
+		print("Middle settings")
+		print("Tank: "+paramTankMid+"  Default: "+tankMid)
+		print("Linear: "+paramLinMid+"  Default: "+linMid)
+		print("Roll: "+paramRotMid+"  Default: "+rotMid)
+		print("Upfeedforward target: "+paramUpFeedforward)
+		print("Downfeedforward target: "+paramDownFeedforward)
+		print("Down glide angle: "+paramLinNoseDownTarget)
+		print("Up glide angle: "+paramLinNoseUpTarget)
+		print("PID settings:")
+		print("Linear kp: "+paramLinKp+" ki: "+paramLinKi+" kd: "+paramLinKd)
+		print("Roll kp: "+paramRollKp+" ki: "+paramRollKi+" kd: "+paramRollKd)
+		print("Glide cycle bottom: "+paramGlideCycleBottom)
+		print("Glide cycle top: "+paramGlideCycleTop)
+	if value[0]=="help":
+		printHelp()
+	
+	return command
+		
+		
+			
+		
+		
+
+
+running=1
+
+start = timeit.timeit()
+command = GLIDE
+completedGlides=0
+lin = 0
+rot=0
+pump=0
+mode=POSITION
+
+while(running==1):
+
+	updateIMU()
+	updateCompass()
+	updateGlider()
+	SDgo=0
+	if(SDgo):
+		logData()
+
+	newCommand=readSerial()
+	if newCommand != GLIDE:
+		command=newCommand
+
+	if command==START:
+		if checkPump(paramTankMid)&checkMass(paramLinMid):
+			completedGlides=0
+			t0=millis()
+			tstart=t0
+			rollI=0
+			rotOutput=0
+			lastUpAngle=0
+			lastDownAngle=0
+			downLoops=0
+			upLoops=0
+			currentState=DOWNGLIDE
+			flag=false
+			command=GLIDE
+		else:
+			actuate(paramLinMid,paramRotMid,paramTankMid,POSITION)
+
+	if command==STOP:
+		turnOff()
+
+	if command==GLIDE:
+		completedGlides=completedGlides+sawtooth(lin,rot,pump,mode)
+		actuate(lin,rot,pump,mode)
+		if completedGlides>=paramNumberofGlides:
+			command=FLOAT
+
+	if command==ROLLSTART:
+		tstart=millis()
+		rollI=0
+		rotStor=0
+		rollOutput=0
+		gliderRunTime=0
+		command=ROLLTEST
+
+	if command==ROLLTEST:
+		if gliderRunTime<30000:
+			rollAngle=0
+		elif gliderRunTime<45000:
+			rollAngle=paramRollover
+		elif gliderRunTime<60000:
+			rollAngle=-paramRollover
+		elif gliderRunTime<75000:
+			rollAngle=paramRollover
+		elif gliderRunTime<90000:
+			rollAngle=-paramRollover
+		elif gliderRunTime<105000:
+			rollAngle=paramRollover
+		elif gliderRunTime<120000:
+			rollAngle=-paramRollover
+		elif gliderRunTime<135000:
+			rollAngle=paramRollover
+		elif gliderRunTime<150000:
+			rollAngle=-paramRollover
+		else:
+			command=RESET
+
+		if turnFeedback:
+			rollAngle=rotPID(rollAngle)
+
+		actuate(paramLinMid,rollAngle,paramTankMid,POSITION)
+
+
