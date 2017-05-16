@@ -17,16 +17,16 @@ motBPWM = "P9_22"
 motAConf1 = "P9_14"
 motAConf2 = "P9_15"
 motStdby = "P9_13"
-motBConf1 = "P9_16"
+motBConf1 = "P9_16"  # what are the two configs of the motB?
 motBConf2 = "P9_17"
 
-pumpOn = "P9_16"
-pumpDir = "P9_17"
+pumpOn = "P9_16"  # shared with motBConfig1
+pumpDir = "P9_17" # shared with motbConfig2
 
 tankLevelPin = "P9_37"
-linPosPin = "P9_37"
+linPosPin = "P9_37" # shared with tanklevelPin   (33,35,36,38,39,40 are available for ADC)
 
-pressureSensorPin = "P9_37"
+pressureSensorPin = "P9_37" # shared with tanklevelPin
 
 rotServoPin = "P8_19"
 
@@ -50,19 +50,23 @@ currentState=DOWNGLIDE
 
 #i2c = Adafruit_I2C(0x1E)
 
-Adafruit_BBIO.PWM.start(str(motAPWM), 50)
+Adafruit_BBIO.PWM.start(str(motAPWM), 50)   # why not PWM.start(str(motAPWM), 50)
 Adafruit_BBIO.PWM.start(str(motBPWM),50)
 Adafruit_BBIO.PWM.start(str(rotServoPin),50)
 Adafruit_BBIO.PWM.set_duty_cycle(str(motAPWM),0)
 Adafruit_BBIO.PWM.set_duty_cycle(str(motBPWM),0)
 
+# do we only have 6 output pins?
 
-Adafruit_BBIO.GPIO.setup("P9_13",Adafruit_BBIO.GPIO.OUT)#motconfa1
+Adafruit_BBIO.GPIO.setup("P9_13",Adafruit_BBIO.GPIO.OUT)#motconfa1     # this is the motStdby not motconfig1
 Adafruit_BBIO.GPIO.setup("P9_14",Adafruit_BBIO.GPIO.OUT)#motconfa2
 Adafruit_BBIO.GPIO.setup("P9_15",Adafruit_BBIO.GPIO.OUT)#motconfb1
 Adafruit_BBIO.GPIO.setup("P9_16",Adafruit_BBIO.GPIO.OUT)#motconfb2
 Adafruit_BBIO.GPIO.setup("P9_17",Adafruit_BBIO.GPIO.OUT)#motstby
 Adafruit_BBIO.GPIO.setup(str(pumpOn),Adafruit_BBIO.GPIO.OUT)#pumpon
+
+# general question, why changing the style? sometimes pinNumber sometimes pinName ...
+# Pin numbers doesnt match, lets review them before bench test
 
 ADC.setup()
 
@@ -240,13 +244,13 @@ def sawtooth():
 
 
 def millis():
-	return time.time()
+	return time.time()   # returns time in seconds , multiply by 1000 to get miliseconds
 
 def updateIMU():
 	global imuYaw,imuPitch,imuRoll
 	ypr = imu.read_yaw_pitch_roll()
 	imuYaw=ypr.x
-	imuPitch=ypr.y+imuPitchoffset
+	imuPitch=ypr.y+imuPitchoffset    
 	imuRoll=ypr.z+imuRolloffset
 	# gps = imu.read_gps_solution_lla()
 	# gpsEst=imu.read_ins_solution_lla()
@@ -301,7 +305,7 @@ def actuate(lin,rot,tank,mode):
 				updateMotors(-speed)
 
 	if mode==PWM:
-		lin=constrain(l,-100,100)
+		lin=constrain(l,-100,100)   # lin=constrain(lin,-100,100)  ???
 		if lin>0 and gliderLinPos<=paramLinFrontLimit:
 			lin=0
 		if lin<0 and gliderLinPos>=paramLinBackLimit:
@@ -327,7 +331,7 @@ def updateServo(angle):
 	duty_min=3#need to be experimentally set
 	duty_max=14.5#need to be experimentally set
 	duty_span=duty_max-duty_min
-	duty=100-((angle/180)*duty_span+duty_min)
+	duty=100-((angle/180)*duty_span+duty_min)  #is the math correct?
 	Adafruit_BBIO.PWM.set_duty_cycle(str(rotServoPin),duty)
 
 def updateTank(tank):
@@ -338,9 +342,9 @@ def updateTank(tank):
 	if abs(gliderTankPos-tank)<10:
 		tank=0
 	if gliderTankPos>tank:
-		Adafruit_BBIO.GPIO.output("P9_17",Adafruit_BBIO.GPIO.LOW)
+		Adafruit_BBIO.GPIO.output("P9_17",Adafruit_BBIO.GPIO.LOW) # use pin name instead of numbers, this is shared with motBconfig 
 	else:
-		Adafruit_BBIO.GPIO.output("P9_17",Adafruit_BBIO.GPIO.HIGH)
+		Adafruit_BBIO.GPIO.output("P9_17",Adafruit_BBIO.GPIO.HIGH) # same here
 	if tank==0:
 		Adafruit_BBIO.GPIO.output(pumpOn,Adafruit_BBIO.GPIO.LOW)
 	else:
@@ -348,7 +352,7 @@ def updateTank(tank):
 
 def updateMotors(speed):
 	if speed>0:
-		Adafruit_BBIO.GPIO.output("P9_14",Adafruit_BBIO.GPIO.HIGH)
+		Adafruit_BBIO.GPIO.output("P9_14",Adafruit_BBIO.GPIO.HIGH)  # use pin names
 		Adafruit_BBIO.GPIO.output("P9_15",Adafruit_BBIO.GPIO.LOW)
 		Adafruit_BBIO.GPIO.output("P9_16",Adafruit_BBIO.GPIO.HIGH)
 		Adafruit_BBIO.GPIO.output("P9_17",Adafruit_BBIO.GPIO.LOW)
@@ -367,6 +371,7 @@ def updateMotors(speed):
 def rotPID(rot):
 	error=-(rot-imuRoll)
 	rollI=rollI+error/100
+	#imuRollD ???
 	rotOutput=paramRollKp*error+paramRollKi*rollI+paramRollKd*imuRollD+rotOutput
 	rotOutput=constrain(rotOutput,-90,90)
 	return rotOutput
@@ -374,6 +379,7 @@ def rotPID(rot):
 def linPIDRate(lin):
 	P=-(lin-imuPitch)
 	linI=linI+P/100
+	#imuPitchD ??
 	return paramLinKp*P+paramLinKi*linI+paramLinKd*imuPitchD
 
 def logData():
@@ -716,8 +722,8 @@ lin = 0
 rot=0
 pump=0
 updateIMU()
-imuRolloffset=-imuRoll
-imuPitchoffset=-imuPitch
+imuRolloffset=-imuRoll  # this doesnt make sense,
+imuPitchoffset=-imuPitch  # this doesnt make sense,
 # imu.tare()
 
 createSDfile()
@@ -756,7 +762,7 @@ while(running==1):
 			upLoops=0
 			currentState=DOWNGLIDE
 			flag=False
-			command=GLIDE
+			command=GLIDE #where is glide defined
 		else:
 			actuate(paramLinMid,paramRotMid,paramTankMid,POSITION)
 
@@ -767,7 +773,7 @@ while(running==1):
 		completedGlides=completedGlides+sawtooth()
 		actuate(lin,rot,pump,mode)
 		if completedGlides>=paramNumberofGlides:
-			command=FLOAT
+			command=FLOAT  # where is flaot defined
 
 	if command==ROLLSTART:
 		tstart=millis()
@@ -797,7 +803,7 @@ while(running==1):
 		elif gliderRunTime<150000:
 			rollAngle=-paramRollover
 		else:
-			command=RESET
+			command=RESET   # where is RESET defined?
 
 		if turnFeedback:
 			rollAngle=rotPID(rollAngle)
