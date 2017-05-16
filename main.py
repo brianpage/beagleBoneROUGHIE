@@ -57,11 +57,11 @@ Adafruit_BBIO.PWM.set_duty_cycle(str(motAPWM),0)
 Adafruit_BBIO.PWM.set_duty_cycle(str(motBPWM),0)
 
 
-Adafruit_BBIO.GPIO.setup("P9_13",Adafruit_BBIO.GPIO.OUT)#motconfa1
-Adafruit_BBIO.GPIO.setup("P9_14",Adafruit_BBIO.GPIO.OUT)#motconfa2
-Adafruit_BBIO.GPIO.setup("P9_15",Adafruit_BBIO.GPIO.OUT)#motconfb1
-Adafruit_BBIO.GPIO.setup("P9_16",Adafruit_BBIO.GPIO.OUT)#motconfb2
-Adafruit_BBIO.GPIO.setup("P9_17",Adafruit_BBIO.GPIO.OUT)#motstby
+Adafruit_BBIO.GPIO.setup(str(motAConf1),Adafruit_BBIO.GPIO.OUT)#motconfa1
+Adafruit_BBIO.GPIO.setup(str(motAConf2),Adafruit_BBIO.GPIO.OUT)#motconfa2
+Adafruit_BBIO.GPIO.setup(str(motBConf1),Adafruit_BBIO.GPIO.OUT)#motconfb1
+Adafruit_BBIO.GPIO.setup(str(motBConf2),Adafruit_BBIO.GPIO.OUT)#motconfb2
+Adafruit_BBIO.GPIO.setup(str(motStdby),Adafruit_BBIO.GPIO.OUT)#motstby
 Adafruit_BBIO.GPIO.setup(str(pumpOn),Adafruit_BBIO.GPIO.OUT)#pumpon
 
 ADC.setup()
@@ -86,6 +86,7 @@ paramNeutralTime=3000
 paramLinFrontLimit=0
 paramLinBackLimit=1
 paramLinMid=0.5
+paramLinRate=100
 paramNumberofGlides=3
 linPIDrate=3
 pressure_m=3
@@ -93,6 +94,9 @@ pressure_b=3
 paramTankBackLimit=0
 paramTankFrontLimit=1
 paramTankMid=0.5
+paramRotLowLimit=0
+paramRotHighLimit=180
+paramRotMid=90
 
 
 flag=0
@@ -109,17 +113,17 @@ t0=0
 
 
 #Config area. Config must be changed before start.
-feedforward=1
-linPID=0
-dubin=0
-circle=0
-headingControl=0
-delayRoll=0
-headingFeedback=0
-turnFeedback=0
-SDgo=1
-command = START#default=START
-mode=POSITION
+feedforward=1#default=1
+linPID=0#default=0
+dubin=0#default=0
+circle=0#default=0
+headingControl=0#default=0
+delayRoll=0#default=0
+headingFeedback=0#default=0
+turnFeedback=0#default=0
+SDgo=1#default=1
+command = GLIDE#default=START
+mode=POSITION#default=POSITION
 
 
 def sawtooth():
@@ -253,9 +257,9 @@ def updateIMU():
 
 def updateGlider():
 	global gliderLinPos,gliderTankPos,gliderPressure
-	gliderLinPos=ADC.read(linPosPin)
-	gliderTankPos=ADC.read(tankLevelPin)
-	gliderPressure=ADC.read(pressureSensorPin)
+	gliderLinPos=ADC.read(linPosPin)*255
+	gliderTankPos=ADC.read(tankLevelPin)*255
+	gliderPressure=ADC.read(pressureSensorPin)*255
 
 
 def updateCompass():
@@ -284,7 +288,7 @@ def checkFF(tank,angle,flag):
 
 def actuate(lin,rot,tank,mode):
 	#Low level motion controller
-
+	print(gliderLinPos)
 	if mode==POSITION:#Bang-Bang control
 		if lin<paramLinFrontLimit:
 			print("Too far forward, going to limit")
@@ -296,9 +300,9 @@ def actuate(lin,rot,tank,mode):
 			updateMotors(0)
 		else:
 			if gliderLinPos>lin:
-				updateMotors(speed)
+				updateMotors(paramLinRate)
 			else:
-				updateMotors(-speed)
+				updateMotors(-paramLinRate)
 
 	if mode==PWM:
 		lin=constrain(l,-100,100)
@@ -338,31 +342,32 @@ def updateTank(tank):
 	if abs(gliderTankPos-tank)<10:
 		tank=0
 	if gliderTankPos>tank:
-		Adafruit_BBIO.GPIO.output("P9_17",Adafruit_BBIO.GPIO.LOW)
+		Adafruit_BBIO.GPIO.output(str(pumpDir),Adafruit_BBIO.GPIO.LOW)
 	else:
-		Adafruit_BBIO.GPIO.output("P9_17",Adafruit_BBIO.GPIO.HIGH)
+		Adafruit_BBIO.GPIO.output(str(pumpDir),Adafruit_BBIO.GPIO.HIGH)
 	if tank==0:
-		Adafruit_BBIO.GPIO.output(pumpOn,Adafruit_BBIO.GPIO.LOW)
+		Adafruit_BBIO.GPIO.output(str(pumpOn),Adafruit_BBIO.GPIO.LOW)
 	else:
-		Adafruit_BBIO.GPIO.output(pumpOn,Adafruit_BBIO.GPIO.HIGH)
+		Adafruit_BBIO.GPIO.output(str(pumpOn),Adafruit_BBIO.GPIO.HIGH)
 
 def updateMotors(speed):
 	if speed>0:
-		Adafruit_BBIO.GPIO.output("P9_14",Adafruit_BBIO.GPIO.HIGH)
-		Adafruit_BBIO.GPIO.output("P9_15",Adafruit_BBIO.GPIO.LOW)
-		Adafruit_BBIO.GPIO.output("P9_16",Adafruit_BBIO.GPIO.HIGH)
-		Adafruit_BBIO.GPIO.output("P9_17",Adafruit_BBIO.GPIO.LOW)
-		Adafruit_BBIO.GPIO.output("P9_13",Adafruit_BBIO.GPIO.HIGH)
+		Adafruit_BBIO.GPIO.output(str(motAConf1),Adafruit_BBIO.GPIO.HIGH)
+		Adafruit_BBIO.GPIO.output(str(motAConf2),Adafruit_BBIO.GPIO.LOW)
+		Adafruit_BBIO.GPIO.output(str(motBConf1),Adafruit_BBIO.GPIO.HIGH)
+		Adafruit_BBIO.GPIO.output(str(motBConf2),Adafruit_BBIO.GPIO.LOW)
+		Adafruit_BBIO.GPIO.output(str(motStdby),Adafruit_BBIO.GPIO.HIGH)
 	elif speed==0:
-		Adafruit_BBIO.GPIO.output("P9_13",Adafruit_BBIO.GPIO.LOW)
+		Adafruit_BBIO.GPIO.output(str(motStdby),Adafruit_BBIO.GPIO.LOW)
 	else:
-		Adafruit_BBIO.GPIO.output("P9_14",Adafruit_BBIO.GPIO.LOW)
-		Adafruit_BBIO.GPIO.output("P9_15",Adafruit_BBIO.GPIO.HIGH)
-		Adafruit_BBIO.GPIO.output("P9_16",Adafruit_BBIO.GPIO.LOW)
-		Adafruit_BBIO.GPIO.output("P9_17",Adafruit_BBIO.GPIO.HIGH)
-		Adafruit_BBIO.GPIO.output("P9_13",Adafruit_BBIO.GPIO.HIGH)
-	Adafruit_BBIO.PWM.set_duty_cycle("P9_21",abs(speed))
-	Adafruit_BBIO.PWM.set_duty_cycle(motBPWM,abs(speed))
+		Adafruit_BBIO.GPIO.output(str(motAConf1),Adafruit_BBIO.GPIO.LOW)
+		Adafruit_BBIO.GPIO.output(str(motAConf2),Adafruit_BBIO.GPIO.HIGH)
+		Adafruit_BBIO.GPIO.output(str(motBConf1),Adafruit_BBIO.GPIO.LOW)
+		Adafruit_BBIO.GPIO.output(str(motBConf2),Adafruit_BBIO.GPIO.HIGH)
+		Adafruit_BBIO.GPIO.output(str(motStdby),Adafruit_BBIO.GPIO.HIGH)
+	Adafruit_BBIO.PWM.set_duty_cycle(str(motAPWM),abs(speed))
+	Adafruit_BBIO.PWM.set_duty_cycle(str(motBPWM),abs(speed))
+	#print(speed)
 
 def rotPID(rot):
 	error=-(rot-imuRoll)
@@ -744,6 +749,7 @@ while(running==1):
 	# 	command=newCommand
 
 	if command==START:
+		print("Starting Glider Motion")
 		if checkPump(paramTankMid) and checkMass(paramLinMid):
 			completedGlides=0
 			# t0=millis()
@@ -759,6 +765,7 @@ while(running==1):
 			command=GLIDE
 		else:
 			actuate(paramLinMid,paramRotMid,paramTankMid,POSITION)
+			print("Attempting to reset glider")
 
 	if command==STOP:
 		turnOff()
@@ -766,8 +773,13 @@ while(running==1):
 	if command==GLIDE:
 		completedGlides=completedGlides+sawtooth()
 		actuate(lin,rot,pump,mode)
+		#print(pump)
 		if completedGlides>=paramNumberofGlides:
 			command=FLOAT
+			
+	if command==FLOAT:
+		actuate(paramLinFrontLimit,paramRotHighLimit,paramTankFrontLimit,POSITION)
+		print("Floating!")
 
 	if command==ROLLSTART:
 		tstart=millis()
