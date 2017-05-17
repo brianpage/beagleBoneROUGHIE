@@ -9,26 +9,28 @@ import time
 import signal
 import os
 
-
+#Run this line first in terminal
+#config-pin overlay cape-universal
 
 #Set pin numbers
-motAPWM = "P9_21"
-motBPWM = "P9_22"
-motAConf1 = "P9_14"
-motAConf2 = "P9_15"
-motStdby = "P9_13"
-motBConf1 = "P9_16"
-motBConf2 = "P9_17"
+motAPWM = "P8_13"#19" #PWM2A
+motBPWM = "P8_13"#08" #PWM2B
+motAConf1 = "P9_14" #GPIO_67
+motAConf2 = "P9_15" #GPIO_68
+motStdby = "P9_13" #GPIO_45
+motBConf1 = "P9_30" #GPIO_112
+motBConf2 = "P8_09" #GPIO_69
 
-pumpOn = "P9_16"
-pumpDir = "P9_17"
+pumpOn = "P8_15" #Control of buffer to turn on and off speed control
+pumpDir = "P8_26" #Open Ground Discrete for pump control
+pumpPWM = "P9_42"
 
-tankLevelPin = "P9_37"
-linPosPin = "P9_37"
+tankLevelPin = "P9_33" #Draw wire on A4
+linPosPin = "P9_36" #Draw wire on A5
 
-pressureSensorPin = "P9_37"
+pressureSensorPin = "P9_39" #Pressure Sensor from IC3
 
-rotServoPin = "P8_19"
+rotServoPin = "P9_14" #PWM Signal for Rotary Servo
 
 #define glide states
 GLIDE = 0
