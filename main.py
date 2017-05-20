@@ -11,15 +11,21 @@ import os
 
 #Run this line first in terminal
 #config-pin overlay cape-universal
+#echo 76 > /sys/class/gpio/export
+#echo 78 > /sys/class/gpio/export
+#echo 8 > /sys/class/gpio/export
+#echo 80 > /sys/class/gpio/export
+#run python test.py twice (the first time it will error on ADC something)
 
 #Set pin numbers
-motAPWM = "P8_13"#19" #PWM2A
-motBPWM = "P8_13"#08" #PWM2B
-motAConf1 = "P9_14" #GPIO_67
-motAConf2 = "P9_15" #GPIO_68
-motStdby = "P9_13" #GPIO_45
-motBConf1 = "P9_30" #GPIO_112
-motBConf2 = "P8_09" #GPIO_69
+motAPWM = "P8_19" #PWM2A
+motBPWM = "P8_13" #PWM2B
+motAConf1 = "P8_37" #GPIO_78
+motAConf2 = "P8_35" #GPIO_8
+motStdby = "P8_36" #GPIO_80
+motBConf1 = "P9_27" #GPIO_115
+motBConf2 = "P9_41"#GPIO_20    "P8_11"#09 #GPIO_69
+mot12V = "P8_11"
 
 pumpOn = "P8_15" #Control of buffer to turn on and off speed control
 pumpDir = "P8_26" #Open Ground Discrete for pump control
@@ -65,10 +71,14 @@ Adafruit_BBIO.GPIO.setup(str(motBConf1),Adafruit_BBIO.GPIO.OUT)#motconfb1
 Adafruit_BBIO.GPIO.setup(str(motBConf2),Adafruit_BBIO.GPIO.OUT)#motconfb2
 Adafruit_BBIO.GPIO.setup(str(motStdby),Adafruit_BBIO.GPIO.OUT)#motstby
 Adafruit_BBIO.GPIO.setup(str(pumpOn),Adafruit_BBIO.GPIO.OUT)#pumpon
+Adafruit_BBIO.GPIO.setup(str(pumpDir),Adafruit_BBIO.GPIO.OUT)
+Adafruit_BBIO.GPIO.setup(str(mot12V),Adafruit_BBIO.GPIO.OUT)
 
 ADC.setup()
 
 UART.setup("UART1")
+
+
 
 
 imu = VnSensor()
@@ -290,7 +300,7 @@ def checkFF(tank,angle,flag):
 
 def actuate(lin,rot,tank,mode):
 	#Low level motion controller
-	print(gliderLinPos)
+	#print(gliderLinPos)
 	if mode==POSITION:#Bang-Bang control
 		if lin<paramLinFrontLimit:
 			print("Too far forward, going to limit")
@@ -353,23 +363,27 @@ def updateTank(tank):
 		Adafruit_BBIO.GPIO.output(str(pumpOn),Adafruit_BBIO.GPIO.HIGH)
 
 def updateMotors(speed):
+	speed=-75
 	if speed>0:
 		Adafruit_BBIO.GPIO.output(str(motAConf1),Adafruit_BBIO.GPIO.HIGH)
 		Adafruit_BBIO.GPIO.output(str(motAConf2),Adafruit_BBIO.GPIO.LOW)
 		Adafruit_BBIO.GPIO.output(str(motBConf1),Adafruit_BBIO.GPIO.HIGH)
 		Adafruit_BBIO.GPIO.output(str(motBConf2),Adafruit_BBIO.GPIO.LOW)
 		Adafruit_BBIO.GPIO.output(str(motStdby),Adafruit_BBIO.GPIO.HIGH)
+		Adafruit_BBIO.GPIO.output(str(mot12V),Adafruit_BBIO.GPIO.HIGH)
 	elif speed==0:
 		Adafruit_BBIO.GPIO.output(str(motStdby),Adafruit_BBIO.GPIO.LOW)
+		Adafruit_BBIO.GPIO.output(str(mot12V),Adafruit_BBIO.GPIO.LOW)
 	else:
 		Adafruit_BBIO.GPIO.output(str(motAConf1),Adafruit_BBIO.GPIO.LOW)
 		Adafruit_BBIO.GPIO.output(str(motAConf2),Adafruit_BBIO.GPIO.HIGH)
 		Adafruit_BBIO.GPIO.output(str(motBConf1),Adafruit_BBIO.GPIO.LOW)
 		Adafruit_BBIO.GPIO.output(str(motBConf2),Adafruit_BBIO.GPIO.HIGH)
 		Adafruit_BBIO.GPIO.output(str(motStdby),Adafruit_BBIO.GPIO.HIGH)
+		Adafruit_BBIO.GPIO.output(str(mot12V),Adafruit_BBIO.GPIO.HIGH)
 	Adafruit_BBIO.PWM.set_duty_cycle(str(motAPWM),abs(speed))
 	Adafruit_BBIO.PWM.set_duty_cycle(str(motBPWM),abs(speed))
-	#print(speed)
+	print(speed)
 
 def rotPID(rot):
 	error=-(rot-imuRoll)
@@ -730,93 +744,96 @@ imuPitchoffset=-imuPitch
 createSDfile()
 t0=millis()
 while(running==1):
-	# print("Loop START")
-	# t3=millis()
-	updateIMU()
-	# t2=millis()
-	# print("IMU updated%f",t2-t3)
-	updateCompass()
-	# t3=millis()
-	# print("Compass Updated%f",t3-t2)
-	updateGlider()
-	# t2=millis()
-	# print("glider updated%f",t2-t3)
-	if(SDgo):
-		logData()
-	# t3=millis()
-	# print("Data logged%f",t3-t2)
-	# print("data logged%f",millis()-t0)
-	#newCommand=readSerial()
-	# if newCommand != GLIDE:
-	# 	command=newCommand
-
-	if command==START:
-		print("Starting Glider Motion")
-		if checkPump(paramTankMid) and checkMass(paramLinMid):
-			completedGlides=0
-			# t0=millis()
-			tstart=t0
+	try:
+		# print("Loop START")
+		# t3=millis()
+		updateIMU()
+		# t2=millis()
+		# print("IMU updated%f",t2-t3)
+		updateCompass()
+		# t3=millis()
+		# print("Compass Updated%f",t3-t2)
+		updateGlider()
+		# t2=millis()
+		# print("glider updated%f",t2-t3)
+		if(SDgo):
+			logData()
+		# t3=millis()
+		# print("Data logged%f",t3-t2)
+		# print("data logged%f",millis()-t0)
+		#newCommand=readSerial()
+		# if newCommand != GLIDE:
+		# 	command=newCommand
+	
+		if command==START:
+			print("Starting Glider Motion")
+			if checkPump(paramTankMid) and checkMass(paramLinMid):
+				completedGlides=0
+				# t0=millis()
+				tstart=t0
+				rollI=0
+				rotOutput=0
+				lastUpAngle=0
+				lastDownAngle=0
+				downLoops=0
+				upLoops=0
+				currentState=DOWNGLIDE
+				flag=False
+				command=GLIDE
+			else:
+				actuate(paramLinMid,paramRotMid,paramTankMid,POSITION)
+				print("Attempting to reset glider")
+	
+		if command==STOP:
+			turnOff()
+	
+		if command==GLIDE:
+			completedGlides=completedGlides+sawtooth()
+			actuate(lin,rot,pump,mode)
+			#print(pump)
+			if completedGlides>=paramNumberofGlides:
+				command=FLOAT
+				
+		if command==FLOAT:
+			actuate(paramLinFrontLimit,paramRotHighLimit,paramTankFrontLimit,POSITION)
+			print("Floating!")
+	
+		if command==ROLLSTART:
+			tstart=millis()
 			rollI=0
-			rotOutput=0
-			lastUpAngle=0
-			lastDownAngle=0
-			downLoops=0
-			upLoops=0
-			currentState=DOWNGLIDE
-			flag=False
-			command=GLIDE
-		else:
-			actuate(paramLinMid,paramRotMid,paramTankMid,POSITION)
-			print("Attempting to reset glider")
-
-	if command==STOP:
+			rotStor=0
+			rollOutput=0
+			gliderRunTime=0
+			command=ROLLTEST
+	
+		if command==ROLLTEST:
+			if gliderRunTime<30000:
+				rollAngle=0
+			elif gliderRunTime<45000:
+				rollAngle=paramRollover
+			elif gliderRunTime<60000:
+				rollAngle=-paramRollover
+			elif gliderRunTime<75000:
+				rollAngle=paramRollover
+			elif gliderRunTime<90000:
+				rollAngle=-paramRollover
+			elif gliderRunTime<105000:
+				rollAngle=paramRollover
+			elif gliderRunTime<120000:
+				rollAngle=-paramRollover
+			elif gliderRunTime<135000:
+				rollAngle=paramRollover
+			elif gliderRunTime<150000:
+				rollAngle=-paramRollover
+			else:
+				command=RESET
+	
+			if turnFeedback:
+				rollAngle=rotPID(rollAngle)
+	
+			actuate(paramLinMid,rollAngle,paramTankMid,POSITION)
+		# t2=millis()
+		# print("the rest of the stuff took%f",t2-t3)
+	except:
 		turnOff()
-
-	if command==GLIDE:
-		completedGlides=completedGlides+sawtooth()
-		actuate(lin,rot,pump,mode)
-		#print(pump)
-		if completedGlides>=paramNumberofGlides:
-			command=FLOAT
-			
-	if command==FLOAT:
-		actuate(paramLinFrontLimit,paramRotHighLimit,paramTankFrontLimit,POSITION)
-		print("Floating!")
-
-	if command==ROLLSTART:
-		tstart=millis()
-		rollI=0
-		rotStor=0
-		rollOutput=0
-		gliderRunTime=0
-		command=ROLLTEST
-
-	if command==ROLLTEST:
-		if gliderRunTime<30000:
-			rollAngle=0
-		elif gliderRunTime<45000:
-			rollAngle=paramRollover
-		elif gliderRunTime<60000:
-			rollAngle=-paramRollover
-		elif gliderRunTime<75000:
-			rollAngle=paramRollover
-		elif gliderRunTime<90000:
-			rollAngle=-paramRollover
-		elif gliderRunTime<105000:
-			rollAngle=paramRollover
-		elif gliderRunTime<120000:
-			rollAngle=-paramRollover
-		elif gliderRunTime<135000:
-			rollAngle=paramRollover
-		elif gliderRunTime<150000:
-			rollAngle=-paramRollover
-		else:
-			command=RESET
-
-		if turnFeedback:
-			rollAngle=rotPID(rollAngle)
-
-		actuate(paramLinMid,rollAngle,paramTankMid,POSITION)
-	# t2=millis()
-	# print("the rest of the stuff took%f",t2-t3)
-
+		quit()
